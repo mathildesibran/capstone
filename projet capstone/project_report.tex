@@ -1,0 +1,634 @@
+% Advanced Programming 2025 - Project Report Template
+% HEC Lausanne / UNIL
+\documentclass[11pt,a4paper]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+\usepackage{fancyhdr}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{biblatex}
+\addbibresource{references.bib} % optional, if you want a .bib file
+
+% Code listing settings
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{pythonstyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2,
+    language=Python
+}
+
+\lstset{style=pythonstyle}
+
+% Header and footer
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Advanced Programming 2025}
+\lhead{Project Report}
+\rfoot{Page \thepage}
+
+% Title page information - MODIFY THESE
+\title{%
+    \Large \textbf{Advanced Programming 2025} \\
+    \vspace{0.5cm}
+    \LARGE \textbf{Calendar Anomalies and Machine Learning for Daily US Stock Returns} \\
+    \vspace{0.3cm}
+    \large Final Project Report
+}
+\author{
+    Mathilde Sibran \\  % <-- change if needed
+    \texttt{mathilde.sibran@unil.ch} \\  % <-- put your UNIL email
+    Student ID: 21682265          % <-- change to your ID
+}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\begin{abstract}
+\noindent
+This project studies whether well-known calendar anomalies in financial markets
+can be exploited to predict the \emph{direction} of daily stock returns using
+classical machine learning models. Using a panel of S\&P~500 constituents from
+2010 to 2025, I first construct a clean dataset of 40 liquid US stocks with
+limited missing data and compute daily returns and excess returns over the
+S\&P~500 index. I engineer calendar-based features capturing the day-of-week
+effect, the January effect, turn-of-the-month, holiday-related dummies and
+quarter boundaries, together with simple technical indicators (20-day moving
+average and volatility).
+
+I then perform a descriptive anomaly analysis to quantify excess returns on
+anomaly days globally, by ticker and by sector. Finally, I train four
+supervised models --- logistic regression, random forest, gradient boosting and
+a neural network --- to classify next-day excess returns as positive or
+negative, using a temporal train/test split and SMOTE to handle mild class
+imbalance. Results show very small but statistically detectable anomaly
+premia; however, all models achieve test accuracies close to 51\% and do not
+beat a naive majority-class baseline. The main contribution of the project is
+a fully reproducible Python pipeline that links classical market anomaly
+literature with modern machine learning practice and highlights the
+difficulty of extracting economically meaningful predictability from
+daily stock returns.
+\end{abstract}
+
+\vspace{0.5cm}
+\noindent\textbf{Keywords:} calendar anomalies, stock returns, S\&P~500, machine learning, Python
+
+\newpage
+\tableofcontents
+\newpage
+
+% ================== MAIN CONTENT ==================
+
+\section{Introduction}
+\label{sec:introduction}
+
+Financial markets are often modelled as approximately efficient, which implies
+that simple trading rules should not systematically beat a passive benchmark.
+However, a long line of empirical work has documented so-called
+\emph{calendar anomalies}: patterns in asset returns linked to the day of the
+week, the month of the year or specific holidays. Famous examples include the
+day-of-the-week effect, the January effect or the pre-holiday effect. These
+patterns challenge the strong form of the Efficient Market Hypothesis and are
+frequently discussed in both academic papers and practitioner reports.
+
+The research question of this project is the following:
+
+\begin{quote}
+\textbf{Can calendar anomalies and simple technical indicators be used, together
+with standard machine learning models, to predict the sign of daily excess
+returns for US stocks?}
+\end{quote}
+
+This matters for at least two reasons. From an academic perspective, it helps
+to assess whether anomaly premia are strong and stable enough to survive
+out-of-sample testing and realistic modelling choices. From a practical
+perspective, even a small but robust edge in directional prediction could
+justify the use of such signals in trading strategies, after accounting for
+transaction costs and risk.
+
+The objectives of the project are:
+\begin{itemize}
+    \item to build a clean, well-documented dataset of daily prices for a
+    subset of S\&P~500 stocks between 2010 and 2025 and to compute returns and
+    excess returns over the market;
+    \item to encode several calendar anomalies as dummy features and analyse
+    their impact on average excess returns globally, by ticker and by sector;
+    \item to train and evaluate several machine learning classifiers on the
+    binary prediction task ``next-day excess return positive vs.\ negative'';
+    \item to provide a clear, reproducible Python implementation with a single
+    entry point script \texttt{main.py}.
+\end{itemize}
+
+The report is organised as follows. Section~\ref{sec:literature} briefly
+summarises related work on calendar anomalies and machine learning in finance.
+Section~\ref{sec:methodology} describes the data, features, modelling
+approach and implementation. Section~\ref{sec:results} presents the empirical
+results. Section~\ref{sec:discussion} discusses their interpretation and
+limitations. Section~\ref{sec:conclusion} concludes and outlines directions
+for future work.
+
+\section{Literature Review / Related Work}
+\label{sec:literature}
+
+Calendar anomalies have been documented for decades. The day-of-the-week
+effect refers to systematic differences between returns on different weekdays,
+often with lower returns on Mondays and higher returns on Fridays. The January
+effect describes the tendency for stocks, in particular small caps, to earn
+higher returns in January than in other months. Holiday effects capture
+unusually positive returns on the days preceding market holidays. These
+findings appear in many developed markets and asset classes, although the
+magnitude and persistence of the anomalies vary across samples and periods.
+
+At the same time, advances in machine learning have led to increasing interest
+in applying classification and regression models to financial time series.
+Typical algorithms include logistic regression, tree-based ensembles such as
+random forests and gradient boosting, and shallow neural networks. In most
+studies, daily returns are extremely noisy and close to unpredictable after
+transaction costs; models tend to deliver modest improvements over random
+guessing at best.
+
+This project sits at the intersection of these two strands. Rather than
+attempting to predict raw returns purely from technical indicators, I focus on
+a small set of interpretable calendar-based features and ask whether they
+carry enough information to help a range of standard machine learning models
+beat a naive baseline on out-of-sample data.
+
+\section{Methodology}
+\label{sec:methodology}
+
+\subsection{Data Description}
+
+The main dataset is an Excel file \texttt{market\_anomalie.xlsx} supplied as
+part of the course. It contains two sheets:
+
+\begin{itemize}
+    \item \textbf{DAILY}: daily closing prices for 490 tickers that are (or
+    have been) part of the S\&P~500 index, over the period from 2010-01-01 to
+    2025-11-01 (4\,141 trading days). The rows correspond to dates and the
+    columns to tickers.
+    \item \textbf{MONTHLY}: a lower-frequency version with monthly prices,
+    which is not directly used in the modelling but could be useful for
+    robustness checks.
+\end{itemize}
+
+Because not all tickers have complete histories, I first compute the
+percentage of missing daily prices for each ticker. I keep only those with
+less than 5\% missing data and then select the 40 stocks with the highest
+return volatility, measured by the standard deviation of daily log-returns.
+This provides a liquid and informative subset while keeping the computation
+manageable.
+
+In addition, daily market index data are downloaded from \texttt{yfinance}:
+
+\begin{itemize}
+    \item S\&P~500 index (\texttt{\^GSPC}), used as the market benchmark;
+    \item STOXX Europe 600 index (\texttt{\^STOXX}), downloaded but not used
+    directly in the current version of the project.
+\end{itemize}
+
+The S\&P~500 close prices are aligned on the same calendar as the stock
+prices. After reshaping the wide price matrix into long format
+(\texttt{Date}, \texttt{ticker}, \texttt{close\_price}) and merging with the
+index data, the final dataset contains about 165\,000 observations.
+
+A separate CSV file \texttt{sector\_mapping.csv} provides sector labels for a
+subset of the 40 tickers. In practice, only the Energy sector is fully
+represented in this mapping, which limits the scope of the sector-level
+analysis.
+
+\subsection{Approach}
+
+\subsubsection*{Target and basic returns}
+
+For each stock-day observation, I compute:
+
+\begin{itemize}
+    \item the stock daily simple return
+    \[
+        r_{i,t} = \frac{P_{i,t} - P_{i,t-1}}{P_{i,t-1}} ;
+    \]
+    \item the market return \(r^{M}_{t}\) from S\&P~500 index closes;
+    \item the excess return \(er_{i,t} = r_{i,t} - r^{M}_{t}\).
+\end{itemize}
+
+The binary target variable \(y_{i,t}\) for classification is
+\[
+    y_{i,t} =
+    \begin{cases}
+        1 & \text{if } er_{i,t} > 0,\\
+        0 & \text{otherwise.}
+    \end{cases}
+\]
+
+\subsubsection*{Calendar anomaly features}
+
+The following calendar-based dummy variables are constructed:
+
+\begin{itemize}
+    \item \texttt{day\_of\_week}: encoded as an integer 0--4 (Monday--Friday) and optionally one-hot encoded in the models;
+    \item \texttt{month}: month of the year (1--12);
+    \item \texttt{is\_january}: indicator for January (January effect);
+    \item \texttt{turn\_of\_month}: indicator equal to 1 for days around the turn of the month;
+    \item \texttt{pre\_holiday}: indicator for trading days immediately preceding an exchange holiday;
+    \item \texttt{is\_christmas}, \texttt{is\_new\_year}, \texttt{is\_thanksgiving};
+    \item \texttt{is\_first\_day\_quarter}: first trading day of each calendar quarter;
+    \item \texttt{sell\_in\_may}: indicator related to the ``Sell in May and go away'' effect.
+\end{itemize}
+
+These variables allow me to reproduce standard calendar anomalies and to use
+them jointly as predictors in the classification models.
+
+\subsubsection*{Technical indicators}
+
+To complement the calendar features, I compute simple technical indicators
+based on each stock's own price history:
+
+\begin{itemize}
+    \item \texttt{ma20}: 20-day moving average of the stock return;
+    \item \texttt{volatility\_20d}: 20-day rolling standard deviation of returns;
+    \item \texttt{daily\_return}: same as \(r_{i,t}\);
+    \item \texttt{market\_return}: daily S\&P~500 return.
+\end{itemize}
+
+These indicators capture short-term momentum and volatility and are common in
+quantitative trading strategies.
+
+\subsubsection*{Train/test split and resampling}
+
+To avoid look-ahead bias, I perform a temporal split:
+
+\begin{itemize}
+    \item \textbf{Train period:} 2010-01-29 to 2018-12-31 (92\,769 observations);
+    \item \textbf{Test period:} 2019-01-01 to 2025-11-14 (71\,760 observations).
+\end{itemize}
+
+The target distribution is slightly imbalanced, with around 48\% of positive
+excess returns in the raw training data. I therefore apply SMOTE
+(Synthetic Minority Over-sampling Technique) on the training set only, which
+increases the number of minority-class samples and brings the class proportion
+closer to 50/50. The test set is left untouched.
+
+\subsubsection*{Models and evaluation metrics}
+
+I train four models implemented in scikit-learn:
+
+\begin{itemize}
+    \item \textbf{Logistic regression} with \(\ell_{2}\) regularisation;
+    \item \textbf{Random forest} classifier;
+    \item \textbf{Gradient boosting} classifier, with hyperparameters tuned by
+    grid search (best found: learning rate 0.05, max depth 2, 50 estimators);
+    \item \textbf{Multilayer perceptron} classifier (shallow neural network).
+\end{itemize}
+
+As benchmark, I use the accuracy of a trivial classifier that always predicts
+the majority class in the training set.
+
+Performance is evaluated primarily by:
+
+\begin{itemize}
+    \item \textbf{Accuracy}: overall proportion of correct predictions;
+    \item \textbf{AUC}: area under the ROC curve, using predicted probabilities;
+    \item \textbf{Confusion matrix} and \textbf{precision/recall/f1-score} by class.
+\end{itemize}
+
+Given the financial context, even small improvements over 50\% can in theory
+be interesting, but they must be consistent and robust.
+
+\subsection{Implementation}
+
+The entire project is implemented in Python and organised as a small package
+under the \texttt{src/} directory:
+
+\begin{itemize}
+    \item \texttt{data\_loader.py}: reading Excel data, downloading indices
+    from \texttt{yfinance}, selecting the top 40 stocks and structuring the
+    long-format dataset with market returns and sector labels;
+    \item \texttt{features.py}: computation of daily and excess returns,
+    calendar anomaly dummies and rolling technical indicators;
+    \item \texttt{anomalies.py}: descriptive analysis of day-of-week and
+    January effects, with results exported to Excel tables;
+    \item \texttt{anomaly\_analysis.py}: unified analysis of anomaly effects
+    on excess returns (global, by ticker, by sector) and generation of
+    summary plots;
+    \item \texttt{models.py}: definitions of the four machine learning models,
+    the temporal train/test split, SMOTE resampling and evaluation functions;
+    \item \texttt{main.py}: entry point that orchestrates the full pipeline.
+\end{itemize}
+
+The main script can be summarised as follows:
+
+\begin{lstlisting}[caption={Main pipeline in \texttt{main.py}}]
+def main():
+    print("🚀 Starting full pipeline...")
+
+    # 1. Load Excel and sector mapping
+    excel_data = load_excel_data("data/raw/market_anomalie.xlsx")
+    sector_mapping = load_sector_mapping()
+
+    # 2. Download market indices
+    market_indices = download_market_indices()
+
+    # 3. Select top stocks
+    selected_tickers = select_top_stocks(excel_data["sp500_daily"])
+
+    # 4. Clean and structure long-format dataset
+    df = clean_and_structure_data(
+        excel_data["sp500_daily"],
+        selected_tickers,
+        market_indices["sp500_index"],
+        sector_mapping
+    )
+
+    # 5. Feature engineering
+    df = create_features(df)
+
+    # 6. Descriptive anomaly analysis
+    analyze_weekday_effect(df)
+    analyze_january_effect(df)
+    run_anomaly_return_analysis(df)
+
+    # 7. Machine learning models
+    run_logistic_regression(df)
+    run_random_forest(df)
+    run_gradient_boosting(df)
+    run_neural_network(df)
+
+    print("🎉 Pipeline COMPLET terminé !")
+\end{lstlisting}
+
+The code runs on the Nuvolos environment used in the course (1~vCPU, 4~GB
+RAM, Python~3.12) and relies mainly on \texttt{pandas}, \texttt{numpy},
+\texttt{scikit-learn}, \texttt{imbalanced-learn}, \texttt{matplotlib},
+\texttt{seaborn} and \texttt{yfinance}.
+
+\section{Results}
+\label{sec:results}
+
+\subsection{Experimental Setup}
+
+All experiments follow the temporal split described above. Feature engineering
+is applied identically to train and test sets, with any standardisation or
+encoding steps fitted on the training period only and applied to the test
+period.
+
+The main hyperparameters are:
+\begin{itemize}
+    \item Logistic regression: default scikit-learn settings with
+    \(\ell_{2}\) penalty;
+    \item Random forest: default settings with 100 trees;
+    \item Gradient boosting: learning rate 0.05, max depth 2, 50 estimators;
+    \item Neural network: one hidden layer with ReLU activation and
+    early stopping enabled (default scikit-learn configuration).
+\end{itemize}
+
+SMOTE is applied only on the training set. Test performance is always reported
+on the original, untouched test data.
+
+\subsection{Performance Evaluation}
+
+Table~\ref{tab:performance} summarises the test accuracy and AUC of all
+models, together with the majority-class baseline. Values are rounded from the
+logged outputs of the pipeline.
+
+\begin{table}[H]
+\centering
+\caption{Model performance on the test period (2019--2025)}
+\label{tab:performance}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Model} & \textbf{Accuracy} & \textbf{AUC} \\
+\hline
+Baseline (majority class) & 0.520 & -- \\
+Logistic Regression       & 0.515 & 0.514 \\
+Random Forest             & 0.507 & 0.515 \\
+Gradient Boosting         & 0.507 & 0.520 \\
+Neural Network (MLP)      & 0.503 & 0.517 \\
+\hline
+\end{tabular}
+\end{table}
+
+The confusion matrices and classification reports produced by the code show
+roughly symmetric precision and recall for both classes, with macro-averaged
+precision, recall and f1-scores all close to 0.51. The SMOTE resampling avoids
+severe bias towards the majority class, but the overall predictive power
+remains low.
+
+\subsection{Anomaly Return Analysis and Visualizations}
+
+The module \texttt{anomaly\_analysis.py} produces several Excel tables:
+
+\begin{itemize}
+    \item \texttt{anomaly\_global\_returns.xlsx}: global statistics for each
+    anomaly (mean excess return on anomaly vs.\ non-anomaly days, difference
+    and t-statistic);
+    \item \texttt{anomaly\_ticker\_returns.xlsx}: for each ticker and anomaly,
+    mean excess return on anomaly days;
+    \item \texttt{anomaly\_sector\_returns.xlsx}: anomaly statistics by sector
+    (for the subset of stocks with sector labels).
+\end{itemize}
+
+Figure~\ref{fig:global_diff} shows the bar chart of average excess return
+differences between anomaly and normal days. While some anomalies such as
+day-of-week and January display positive differences, magnitudes are small in
+absolute terms.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{results/anomalies/plots/global_anomaly_diff.png}
+\caption{Average excess return difference (anomaly vs.\ non-anomaly days) by anomaly.}
+\label{fig:global_diff}
+\end{figure}
+
+For the sector analysis, the limited coverage of sector labels means that only
+the Energy sector is reliably represented. Its average daily return is
+slightly positive over the sample, with volatility around 3\%. The corresponding
+heatmap of anomaly effects by sector and anomaly is shown in
+Figure~\ref{fig:sector_heatmap}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{results/anomalies/plots/sector_anomaly_heatmap.png}
+\caption{Heatmap of excess return differences by sector and anomaly (where available).}
+\label{fig:sector_heatmap}
+\end{figure}
+
+Variable importance plots from the random forest and gradient boosting models
+confirm that features such as \texttt{ma20}, \texttt{volatility\_20d},
+\texttt{market\_return}, \texttt{month} and \texttt{day\_of\_week} contribute
+most to the predictions, while some holiday dummies have negligible impact.
+
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection*{Why do models not beat the baseline?}
+
+Despite the careful construction of features and the use of several machine
+learning algorithms, none of the models significantly outperforms the naive
+majority-class classifier. There are several reasons for this:
+
+\begin{itemize}
+    \item Daily excess returns are extremely noisy and have very low signal-to-noise ratio. Most of the variation is essentially random from the
+    perspective of our simple feature set.
+    \item Calendar anomalies, even when statistically significant in mean
+    returns, tend to have very small magnitudes (basis points per day). Such
+    small effects are difficult to exploit in a high-variance classification
+    setting.
+    \item The models are intentionally kept simple and conservative to avoid
+    overfitting. More complex architectures might fit the training data better
+    but would likely not generalise.
+    \item Features are based only on past prices and calendar information; no
+    fundamental or cross-sectional information is used.
+\end{itemize}
+
+\subsection*{What was surprising?}
+
+Two aspects were somewhat surprising:
+
+\begin{itemize}
+    \item The descriptive anomaly analysis did show small but visible
+    differences in excess returns on some anomaly days, especially for some
+    tickers and for the Energy sector. However, these differences did not
+    translate into strong predictive performance for individual stock returns.
+    \item Gradient boosting and the neural network achieved slightly higher
+    AUC than accuracy, suggesting that the models capture some marginal
+    ranking information about the probability of positive excess returns, even
+    if the final classification at threshold 0.5 remains weak.
+\end{itemize}
+
+\subsection*{Limitations}
+
+The project has several limitations:
+
+\begin{itemize}
+    \item The sector mapping is incomplete, which restricts the sector-level
+    analysis to a small subset of stocks.
+    \item Transaction costs, bid-ask spreads and other frictions are ignored.
+    Even if the models slightly beat 50\% accuracy, such small edges would not
+    survive realistic trading costs.
+    \item Hyperparameter tuning, especially for the neural network, is fairly
+    limited due to time and computational constraints.
+    \item Only one train/test split is considered; a rolling or expanding
+    window evaluation could provide a more robust assessment of stability over
+    time.
+\end{itemize}
+
+\section{Conclusion and Future Work}
+\label{sec:conclusion}
+
+\subsection{Summary}
+
+This project built a complete Python pipeline to investigate whether calendar
+anomalies and simple technical indicators can help predict the sign of daily
+excess returns for a subset of S\&P~500 stocks. Using data from 2010 to 2025,
+I engineered a set of interpretable features, performed global, ticker-level
+and sector-level anomaly analyses, and trained four standard machine learning
+models.
+
+The main findings are that:
+
+\begin{itemize}
+    \item Several calendar anomalies exhibit small but measurable effects on
+    average excess returns over the sample;
+    \item However, when used as predictors in daily classification models,
+    these features yield test accuracies around 51\%, not significantly above
+    a majority-class baseline;
+    \item Tree-based models highlight the relative importance of moving
+    averages, volatility and some calendar variables, but overall predictive
+    power remains weak.
+\end{itemize}
+
+\subsection{Future Directions}
+
+There are several natural extensions:
+
+\begin{itemize}
+    \item Incorporating additional information, such as cross-sectional factors,
+    market volatility indices or macroeconomic announcements, could enrich the
+    feature set.
+    \item Exploring different prediction horizons (e.g.\ weekly instead of
+    daily) or portfolio-level targets might yield stronger and more exploitable
+    signals.
+    \item Performing a rolling-window backtest with transaction costs would
+    allow a more realistic evaluation from an investment perspective.
+    \item Completing and refining the sector mapping would enable a deeper
+    cross-sector comparison of anomaly effects.
+\end{itemize}
+
+Overall, the project confirms the intuitive idea that calendar anomalies on
+their own are not a ``free lunch'', but it provides a clear and modular code
+base that could be reused for more advanced studies.
+
+% ================== REFERENCES ==================
+\newpage
+\section*{References}
+\addcontentsline{toc}{section}{References}
+
+% If using biblatex (recommended)
+% \printbibliography[heading=none]
+
+% Or manually:
+\begin{enumerate}
+    \item Dataset provided in Advanced Programming 2025 course: daily prices
+    for S\&P~500 constituents, HEC Lausanne / UNIL.
+    \item Pedregosa, F. et al. (2011). \textit{Scikit-learn: Machine Learning in
+    Python}. Journal of Machine Learning Research, 12, 2825--2830.
+    \item Chawla, N. V., Bowyer, K. W., Hall, L. O., \& Kegelmeyer, W. P. (2002).
+    \textit{SMOTE: Synthetic Minority Over-sampling Technique}. Journal of
+    Artificial Intelligence Research, 16, 321--357.
+\end{enumerate}
+
+% ================== APPENDICES ==================
+\newpage
+\appendix
+\section{Additional Figures}
+\label{app:figures}
+
+Additional plots (e.g.\ feature importance bar charts, confusion matrices and
+learning curves) can be included here if needed.
+
+\section{Code Repository}
+\label{app:code}
+
+\noindent
+\textbf{GitHub Repository:} \url{https://github.com/yourusername/project-repo}
+
+\noindent
+To reproduce the results:
+\begin{itemize}
+    \item clone the repository and create the Python environment from
+    \texttt{environment.yml};
+    \item place the raw data files under \texttt{data/raw/};
+    \item run \texttt{python main.py} from the project root.
+\end{itemize}
+
+\end{document}
