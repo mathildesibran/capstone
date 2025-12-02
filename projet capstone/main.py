@@ -26,7 +26,9 @@ def main():
     print("🚀 Starting full pipeline...")
 
     # 1. Charger Excel
-    excel_data = load_excel_data("data/raw/market_anomalie.xlsx")
+    DATA_PATH = "data/raw/market_anomalie.xlsx"
+    excel_data = load_excel_data(DATA_PATH)
+
 
     # 1b. Charger le mapping secteurs
     sector_mapping = load_sector_mapping()
