@@ -85,6 +85,26 @@ def apply_smote(
     )
     return X_train_res, y_train_res
 
+def print_classification_results(
+    model_name: str,
+    y_test: pd.Series,
+    y_pred: np.ndarray,
+    y_proba: np.ndarray | None = None,
+) -> None:
+    print(f"\n📊 {model_name} RESULTS :")
+    print(f"✔️ Accuracy : {accuracy_score(y_test, y_pred):.4f}")
+    if y_proba is not None:
+        try:
+            auc = roc_auc_score(y_test, y_proba)
+            print(f"✔️ AUC      : {auc:.4f}")
+        except Exception:
+            print("AUC        : nan")
+    print("Confusion matrix :")
+    print(confusion_matrix(y_test, y_pred))
+    print("Classification report :")
+    print(classification_report(y_test, y_pred))
+
+
 # --------------------------------------------------------------------
 # 3. Logistic Regression + SMOTE
 # --------------------------------------------------------------------
@@ -108,13 +128,10 @@ def run_logistic_regression(df: pd.DataFrame) -> LogisticRegression:
     y_pred = model.predict(X_test)
     y_proba = model.predict_proba(X_test)[:, 1]
 
-    print("\n📊 LOGISTIC REGRESSION RESULTS :")
-    print(f"✔️ Accuracy : {accuracy_score(y_test, y_pred):.4f}")
-    print(f"✔️ AUC      : {roc_auc_score(y_test, y_proba):.4f}")
-    print("Confusion matrix :")
-    print(confusion_matrix(y_test, y_pred))
-    print("Classification report :")
-    print(classification_report(y_test, y_pred))
+    print_classification_results(
+    "LOGISTIC REGRESSION", y_test, y_pred, y_proba
+)
+
 
     return model
 
@@ -149,13 +166,10 @@ def run_random_forest(df: pd.DataFrame) -> RandomForestClassifier:
     except Exception:
         auc = float("nan")
 
-    print("\n📊 RANDOM FOREST RESULTS :")
-    print(f"✔️ Accuracy : {accuracy_score(y_test, y_pred):.4f}")
-    print(f"✔️ AUC      : {auc:.4f}")
-    print("Confusion matrix :")
-    print(confusion_matrix(y_test, y_pred))
-    print("Classification report :")
-    print(classification_report(y_test, y_pred))
+    print_classification_results(
+    "RANDOM FOREST", y_test, y_pred, y_proba if "y_proba" in locals() else None
+)
+
 
     print("\n🌟 Variable importance :")
     for name, score in sorted(
@@ -177,7 +191,6 @@ def run_gradient_boosting(df: pd.DataFrame) -> GradientBoostingClassifier:
 
     # ---------- SMOTE ----------
     X_train_res, y_train_res = apply_smote(X_train, y_train)
-    )
     # ---------------------------
 
     base_model = GradientBoostingClassifier(random_state=42)
@@ -201,23 +214,19 @@ def run_gradient_boosting(df: pd.DataFrame) -> GradientBoostingClassifier:
     y_pred = best_model.predict(X_test)
     y_proba = best_model.predict_proba(X_test)[:, 1]
 
-    print(f"\n🔍 Best params : {grid.best_params_}")
+    print_classification_results(
+        "GRADIENT BOOSTING", y_test, y_pred, y_proba
+    )
 
-    print("\n📊 GRADIENT BOOSTING RESULTS :")
-    print(f"✔️ Accuracy : {accuracy_score(y_test, y_pred):.4f}")
-    print(f"✔️ AUC      : {roc_auc_score(y_test, y_proba):.4f}")
-    print("Confusion matrix :")
-    print(confusion_matrix(y_test, y_pred))
-    print("Classification report :")
-    print(classification_report(y_test, y_pred))
-
-    print("\n🌟 Variable importance :")
     for name, score in sorted(
-        zip(FEATURE_COLS, best_model.feature_importances_), key=lambda x: x[1], reverse=True
+        zip(FEATURE_COLS, best_model.feature_importances_),
+        key=lambda x: x[1],
+        reverse=True,
     ):
         print(f"{name:<22} : {score:.3f}")
 
     return best_model
+
 
 
 # --------------------------------------------------------------------
@@ -250,12 +259,9 @@ def run_neural_network(df: pd.DataFrame) -> MLPClassifier:
     except Exception:
         auc = float("nan")
 
-    print("\n📊 NEURAL NETWORK RESULTS :")
-    print(f"✔️ Accuracy : {accuracy_score(y_test, y_pred):.4f}")
-    print(f"✔️ AUC      : {auc:.4f}")
-    print("Confusion matrix :")
-    print(confusion_matrix(y_test, y_pred))
-    print("Classification report :")
-    print(classification_report(y_test, y_pred))
+    print_classification_results(
+    "NEURAL NETWORK", y_test, y_pred, y_proba if "y_proba" in locals() else None
+)
+
 
     return mlp
