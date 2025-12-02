@@ -14,12 +14,15 @@ from sklearn.metrics import (
 )
 
 from imblearn.over_sampling import SMOTE
-
+from typing import List, Tuple
+import numpy as np
 
 # --------------------------------------------------------------------
 # 1. Split temporel (train = 2010–2018 / test = 2019–2024+)
 # --------------------------------------------------------------------
-def temporal_train_test_split(df, feature_cols):
+def temporal_train_test_split(
+    df: pd.DataFrame, feature_cols: List[str]
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
 
     # On enlève les lignes avec NaN sur les features / target / Date
     ml_df = df.dropna(subset=feature_cols + ["outperform", "Date"]).copy()
@@ -75,7 +78,7 @@ FEATURE_COLS = [
 # --------------------------------------------------------------------
 # 3. Logistic Regression + SMOTE
 # --------------------------------------------------------------------
-def run_logistic_regression(df):
+def run_logistic_regression(df: pd.DataFrame) -> LogisticRegression:
 
     print("\n🤖 Étape ML1 : Logistic Regression...")
 
@@ -114,7 +117,7 @@ def run_logistic_regression(df):
 # --------------------------------------------------------------------
 # 4. Random Forest + SMOTE
 # --------------------------------------------------------------------
-def run_random_forest(df):
+def run_random_forest(df: pd.DataFrame) -> RandomForestClassifier:
 
     print("\n🌲 Étape ML2 : Random Forest...")
 
@@ -166,7 +169,7 @@ def run_random_forest(df):
 # --------------------------------------------------------------------
 # 5. Gradient Boosting + SMOTE
 # --------------------------------------------------------------------
-def run_gradient_boosting(df):
+def run_gradient_boosting(df: pd.DataFrame) -> GradientBoostingClassifier:
 
     print("\n🔥 Étape ML3 : Gradient Boosting...")
 
@@ -224,7 +227,7 @@ def run_gradient_boosting(df):
 # --------------------------------------------------------------------
 # 6. Neural Network (MLP) + SMOTE
 # --------------------------------------------------------------------
-def run_neural_network(df):
+def run_neural_network(df: pd.DataFrame) -> MLPClassifier:
 
     print("\n🔮 Étape ML4 : Neural Network (MLPClassifier)...")
 
