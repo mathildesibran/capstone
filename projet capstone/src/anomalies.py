@@ -1,11 +1,17 @@
+# src/anomalies.py
+
 import os
+import calendar
+
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
-import calendar
 
-def auto_width_excel(path):
-    """Ajuste automatiquement la largeur des colonnes dans un Excel."""
+
+def auto_width_excel(path: str) -> None:
+    """
+    Automatically adjust column widths in an Excel file.
+    """
     wb = load_workbook(path)
     ws = wb.active
 
@@ -15,8 +21,7 @@ def auto_width_excel(path):
 
         for cell in col:
             try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
+                max_length = max(max_length, len(str(cell.value)))
             except Exception:
                 pass
 
@@ -27,17 +32,29 @@ def auto_width_excel(path):
 
 
 # ============================================================================
-# A1 — Effet Day-of-Week
+# A1 — Day-of-Week Effect
 # ============================================================================
 
-def analyze_weekday_effect(df):
-    print("\n📊 Analyse A1 : Day-of-Week effect")
+
+def analyze_weekday_effect(df: pd.DataFrame):
+    """
+    Analyze the day-of-week anomaly.
+
+    For each ticker and each weekday, this function computes:
+    - Mean daily return
+    - Return standard deviation
+    - Probability of outperforming the market
+    - Number of observations
+
+    The results are saved both at the ticker level and in a global aggregated table.
+    """
+    print("\nRunning analysis A1: Day-of-Week effect")
 
     grouped = df.groupby(["ticker", "day_of_week"]).agg(
         mean_return=("daily_return", "mean"),
         std_return=("daily_return", "std"),
         prob_outperform=("outperform", "mean"),
-        n_obs=("daily_return", "count")
+        n_obs=("daily_return", "count"),
     ).reset_index()
 
     grouped["day_name"] = grouped["day_of_week"].map(lambda x: calendar.day_name[x])
@@ -46,7 +63,7 @@ def analyze_weekday_effect(df):
         mean_return=("mean_return", "mean"),
         std_return=("std_return", "mean"),
         prob_outperform=("prob_outperform", "mean"),
-        n_obs=("n_obs", "sum")
+        n_obs=("n_obs", "sum"),
     ).reset_index()
 
     os.makedirs("results/tables", exist_ok=True)
@@ -55,28 +72,35 @@ def analyze_weekday_effect(df):
 
     grouped.to_excel(detail_path, index=False)
     global_stats.to_excel(global_path, index=False)
+
     auto_width_excel(detail_path)
     auto_width_excel(global_path)
 
-    print(f"📁 A1 sauvegardé : {detail_path}")
-    print(f"📁 A1 global      : {global_path}")
+    print(f"A1 ticker-level results saved to: {detail_path}")
+    print(f"A1 global results saved to:       {global_path}")
 
     return grouped, global_stats
 
 
-
 # ============================================================================
-# A2 — Effet January
+# A2 — January Effect
 # ============================================================================
 
-def analyze_january_effect(df):
-    print("\n📊 Analyse A2 : January effect")
+
+def analyze_january_effect(df: pd.DataFrame):
+    """
+    Analyze the January anomaly.
+
+    This function compares the performance of stocks in January against the
+    performance in all other months.
+    """
+    print("\nRunning analysis A2: January effect")
 
     grouped = df.groupby(["ticker", "month"]).agg(
         mean_return=("daily_return", "mean"),
         std_return=("daily_return", "std"),
         prob_outperform=("outperform", "mean"),
-        n_obs=("daily_return", "count")
+        n_obs=("daily_return", "count"),
     ).reset_index()
 
     global_stats = grouped.copy()
@@ -86,7 +110,7 @@ def analyze_january_effect(df):
         mean_return=("mean_return", "mean"),
         std_return=("std_return", "mean"),
         prob_outperform=("prob_outperform", "mean"),
-        n_obs=("n_obs", "sum")
+        n_obs=("n_obs", "sum"),
     ).reset_index()
 
     global_stats["label"] = global_stats["is_january"].map(
@@ -99,10 +123,11 @@ def analyze_january_effect(df):
 
     grouped.to_excel(detail_path, index=False)
     global_stats.to_excel(global_path, index=False)
+
     auto_width_excel(detail_path)
     auto_width_excel(global_path)
 
-    print(f"📁 A2 sauvegardé : {detail_path}")
-    print(f"📁 A2 global      : {global_path}")
+    print(f"A2 ticker-level results saved to: {detail_path}")
+    print(f"A2 global results saved to:       {global_path}")
 
     return grouped, global_stats

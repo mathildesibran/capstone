@@ -1,7 +1,7 @@
-import sys
+iimport sys
 import os
 
-# ajouter src/ au PYTHONPATH
+# Add the src/ directory to the Python path
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 
 from data_loader import (
@@ -22,10 +22,14 @@ from models import (
 from anomaly_analysis import run_anomaly_return_analysis, analyze_sectors
 
 
+# If set to True, machine learning models are skipped to speed up execution
 FAST_MODE = False
 
 
 def run_all_models(df):
+    """
+    Run all machine learning models sequentially.
+    """
     run_logistic_regression(df)
     run_random_forest(df)
     run_gradient_boosting(df)
@@ -33,26 +37,29 @@ def run_all_models(df):
 
 
 def main():
-    print("🚀 Starting full pipeline...")
+    """
+    Main execution pipeline for the market anomaly analysis project.
+    """
+    print("Starting full pipeline...")
 
-    # 1. Charger Excel
+    # 1. Load Excel input data
     DATA_PATH = "data/raw/market_anomalie.xlsx"
     excel_data = load_excel_data(DATA_PATH)
 
-    # 1b. Charger le mapping secteurs
-    print("📥 Loading sector mapping...")
+    # 1b. Load sector mapping
+    print("Loading sector mapping...")
     sector_mapping = load_sector_mapping()
 
-    # 2. Télécharger indices
-    print("📉 Downloading market indices...")
+    # 2. Download market indices
+    print("Downloading market indices...")
     market_indices = download_market_indices()
 
-    # 3. Sélection des tickers
-    print("📊 Selecting top stocks...")
+    # 3. Select top stocks from the S&P 500 universe
+    print("Selecting top stocks...")
     selected_tickers = select_top_stocks(excel_data["sp500_daily"])
 
-    # 4. Structuration
-    print("🧹 Cleaning and structuring data...")
+    # 4. Clean and structure the dataset
+    print("Cleaning and structuring data...")
     df = clean_and_structure_data(
         excel_data["sp500_daily"],
         selected_tickers,
@@ -60,34 +67,35 @@ def main():
         sector_mapping,
     )
 
-    # 5. Features
-    print("🧠 Creating features...")
+    # 5. Feature engineering
+    print("Creating features...")
     df = create_features(df)
 
+    # Safety check: stop if dataset is empty
     if df.empty:
-        print("⚠️ Dataset vide après feature engineering. Arrêt du pipeline.")
+        print("Dataset is empty after feature engineering. Pipeline stopped.")
         return
 
-    # 6. Anomalies descriptives
-    print("📈 Running descriptive anomalies...")
+    # 6. Descriptive anomaly analysis
+    print("Running descriptive anomaly analysis...")
     analyze_weekday_effect(df)
     analyze_january_effect(df)
 
-    # 6b. Analyse des rendements par anomalie
+    # 6b. Anomaly-based return analysis
     run_anomaly_return_analysis(df)
 
-    # 6c. 🔎 Analyse sectorielle
-    print("🏭 Running sector analysis...")
+    # 6c. Sector-level analysis
+    print("Running sector analysis...")
     analyze_sectors(df)
 
-    # 7. Machine Learning
+    # 7. Machine learning models
     if not FAST_MODE:
-        print("🤖 Running machine learning models...")
+        print("Running machine learning models...")
         run_all_models(df)
     else:
-        print("⚡ FAST MODE activé : Machine Learning ignoré.")
+        print("FAST MODE enabled: machine learning models skipped.")
 
-    print("\n🎉 Pipeline COMPLET terminé !")
+    print("Pipeline completed successfully.")
 
 
 if __name__ == "__main__":

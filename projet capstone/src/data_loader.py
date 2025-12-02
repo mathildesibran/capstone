@@ -1,137 +1,156 @@
+# src/data_loader.py
+
 import os
+from typing import Dict, List
+
 import pandas as pd
 import yfinance as yf
-import numpy as np
+
 
 # ============================================================================
-# PARTIE 1 : CHARGEMENT DES DONNÉES EXCEL
+# PART 1: EXCEL DATA LOADING
 # ============================================================================
 
-def load_excel_data(filepath="data/raw/market_anomalie.xlsx"):
+
+def load_excel_data(filepath: str = "data/raw/market_anomalie.xlsx") -> Dict[str, pd.DataFrame]:
     """
-    Charge les 2 onglets du fichier Excel :
-    - DAILY
-    - MONTHLY
+    Load the two sheets from the Excel file:
+
+    - DAILY   : daily prices for S&P 500 constituents
+    - MONTHLY : monthly prices for S&P 500 constituents
     """
-    print("📊 Chargement du fichier Excel...")
+    print("Loading Excel file...")
 
     sp500_daily = pd.read_excel(
         filepath,
         sheet_name="DAILY",
-        index_col=0,      # Date en index
-        parse_dates=True
+        index_col=0,      # Date as index
+        parse_dates=True,
     )
     sp500_monthly = pd.read_excel(
         filepath,
         sheet_name="MONTHLY",
-        index_col=0,      # Date en index
-        parse_dates=True
+        index_col=0,      # Date as index
+        parse_dates=True,
     )
 
-    print("✅ Données chargées :")
+    print("Excel data loaded:")
     print(f"   - S&P 500 DAILY:   {sp500_daily.shape}")
     print(f"   - S&P 500 MONTHLY: {sp500_monthly.shape}")
 
     return {
         "sp500_daily": sp500_daily,
-        "sp500_monthly": sp500_monthly
+        "sp500_monthly": sp500_monthly,
     }
 
 
 # ============================================================================
-# PARTIE 2 : TÉLÉCHARGEMENT DES INDICES
+# PART 2: MARKET INDEX DOWNLOAD
 # ============================================================================
 
-def download_market_indices(start_date="2010-01-01", end_date="2025-11-01"):
+
+def download_market_indices(
+    start_date: str = "2010-01-01",
+    end_date: str = "2025-11-01",
+) -> Dict[str, pd.DataFrame]:
     """
-    Télécharge les indices S&P500 (^GSPC) et STOXX 600 (^STOXX)
-    et renvoie les DataFrames bruts de yfinance.
+    Download S&P 500 (^GSPC) and STOXX 600 (^STOXX) indices from Yahoo Finance
+    and return the raw DataFrames.
     """
-    print("\n📈 Téléchargement des indices de marché...")
+    print("\nDownloading market indices...")
 
     sp500_index = yf.download("^GSPC", start=start_date, end=end_date, progress=False)
     stoxx_index = yf.download("^STOXX", start=start_date, end=end_date, progress=False)
 
-    print(f"   - S&P 500 Index téléchargé :  {sp500_index.shape[0]} jours")
-    print(f"   - STOXX 600 Index téléchargé : {stoxx_index.shape[0]} jours")
+    print(f"   - S&P 500 index downloaded:  {sp500_index.shape[0]} trading days")
+    print(f"   - STOXX 600 index downloaded: {stoxx_index.shape[0]} trading days")
 
     return {
-        "sp500_index": sp500_index,   # on garde TOUTES les colonnes
+        "sp500_index": sp500_index,  # keep all columns for flexibility
         "stoxx_index": stoxx_index,
     }
 
 
 # ============================================================================
-# PARTIE 3 : SÉLECTION DES 40 MEILLEURES ACTIONS
+# PART 3: SELECTION OF TOP 40 STOCKS
 # ============================================================================
 
-def select_top_stocks(df, n_stocks=40):
-    """
-    Sélectionne les 40 meilleures actions à partir du dataframe DAILY.
-    Critère : moins de 5% de données manquantes puis plus forte volatilité.
-    """
-    print("\n🎯 Sélection des meilleures actions...")
 
-    # % de valeurs manquantes par colonne (par ticker)
+def select_top_stocks(df: pd.DataFrame, n_stocks: int = 40) -> List[str]:
+    """
+    Select the top N stocks from the DAILY price DataFrame.
+
+    Selection criteria:
+    1. Less than 5% missing observations.
+    2. Among those, highest return volatility.
+    """
+    print("\nSelecting top stocks based on data availability and volatility...")
+
+    # Percentage of missing values per column (per ticker)
     missing_pct = df.isnull().sum() / len(df) * 100
     valid_stocks = missing_pct[missing_pct < 5].index.tolist()
 
-    print(f"   - {len(valid_stocks)} actions avec <5% de données manquantes")
+    print(f"   - {len(valid_stocks)} stocks with less than 5% missing data")
 
-    # Volatilité des rendements
+    # Volatility of daily returns
     returns = df[valid_stocks].pct_change()
     volatility = returns.std().sort_values(ascending=False)
 
     selected_stocks = volatility.head(n_stocks).index.tolist()
 
-    print(f"✅ {len(selected_stocks)} actions sélectionnées")
-
-    print("\n📌 TICKERS UTILISÉS PAR LE PROJET :")
+    print(f"   - {len(selected_stocks)} stocks selected for the analysis")
+    print("\nTickers used in the project:")
     for t in selected_stocks:
-        print("   •", t)
+        print(f"   • {t}")
 
     return selected_stocks
 
 
 # ============================================================================
-# PARTIE 4 : NETTOYAGE + STRUCTURATION + SECTEURS
+# PART 4: DATA CLEANING, STRUCTURING AND SECTOR MERGE
 # ============================================================================
 
-def clean_and_structure_data(excel_daily, selected_tickers, sp500_index, sector_mapping):
-    """
-    - Garde uniquement les tickers sélectionnés
-    - Met les données au format long (Date, ticker, close_price)
-    - Ajoute l'index S&P 500 (SP500_Close)
-    - Ajoute le secteur de chaque ticker
-    """
-    print("\n🧹 Nettoyage et structuration des données...")
 
-    # 1) On garde seulement les colonnes des tickers sélectionnés
+def clean_and_structure_data(
+    excel_daily: pd.DataFrame,
+    selected_tickers: List[str],
+    sp500_index: pd.DataFrame,
+    sector_mapping: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Build the main analysis DataFrame:
+
+    - Keep only the selected tickers from the daily price panel.
+    - Reshape the data to long format: (Date, ticker, close_price).
+    - Merge S&P 500 index level as SP500_Close.
+    - Merge sector information for each ticker.
+    """
+    print("\nCleaning and structuring data...")
+
+    # 1) Keep only selected tickers
     df = excel_daily[selected_tickers].copy()
 
-    # L’index est la date → on le remet comme vraie colonne "Date"
+    # Reset index so that the date becomes an explicit column
     df = df.reset_index()
-    if "Date" not in df.columns:  # au cas où la colonne s'appelle "index"
+    if "Date" not in df.columns:  # fallback if the first column is unnamed
         df = df.rename(columns={df.columns[0]: "Date"})
 
-    # Passage en format long
+    # Long format: one row per (Date, ticker)
     df = df.melt(
         id_vars="Date",
         var_name="ticker",
-        value_name="close_price"
+        value_name="close_price",
     )
 
-    # On enlève les lignes sans prix
+    # Remove rows without a valid price
     df = df.dropna(subset=["close_price"])
 
-    # 2) Préparer le S&P 500
+    # 2) Prepare the S&P 500 index series
     sp500 = sp500_index.copy()
 
-    # Si colonnes MultiIndex (('Close','^GSPC'), ...) → on garde le 1er niveau
+    # If columns are a MultiIndex ((Close, ^GSPC), ...), keep only the first level
     if isinstance(sp500.columns, pd.MultiIndex):
         sp500.columns = sp500.columns.get_level_values(0)
-
-    print("   Colonnes SP500 :", sp500.columns.tolist())
 
     possible_cols = ["Close", "close", "Adj Close", "adjclose"]
     price_col = None
@@ -142,43 +161,47 @@ def clean_and_structure_data(excel_daily, selected_tickers, sp500_index, sector_
 
     if price_col is None:
         raise ValueError(
-            "Impossible de trouver une colonne de prix dans sp500_index "
-            "(cherché : 'Close', 'close', 'Adj Close', 'adjclose')."
+            "Could not find a price column in sp500_index "
+            "(searched for: 'Close', 'close', 'Adj Close', 'adjclose')."
         )
 
     sp500_df = (
         sp500[[price_col]]
         .rename(columns={price_col: "SP500_Close"})
-        .reset_index()              # index → colonne Date
+        .reset_index()  # index → Date column
         .rename(columns={sp500.index.name or "Date": "Date"})
     )
 
-    # 3) Fusion actions + index
+    # 3) Merge stock prices with S&P 500 index level
     df = df.merge(sp500_df, on="Date", how="left")
 
-    # 4) Ajouter les secteurs
+    # 4) Merge sector information
     df = df.merge(sector_mapping, on="ticker", how="left")
 
-    print("   Ajout des secteurs effectué.")
-    print("   Lignes sans secteur :", df["sector"].isna().sum())
-
-    print("   Données structurées :")
-    print(df.head())
-    print(f"\n✅ Données structurées prêtes ({len(df)} lignes)")
+    print("   Sector information merged.")
+    print(f"   Rows without sector information: {df['sector'].isna().sum()}")
+    print(f"   Structured dataset ready with {len(df)} rows.")
 
     return df
 
 
-def load_sector_mapping(filepath="data/raw/sector_mapping.csv"):
+# ============================================================================
+# PART 5: SECTOR MAPPING
+# ============================================================================
+
+
+def load_sector_mapping(filepath: str = "data/raw/sector_mapping.csv") -> pd.DataFrame:
     """
-    Charge le mapping des secteurs pour chaque ticker.
-    CSV attendu avec au moins les colonnes : 'ticker', 'sector'
-    (ou 'Ticker', 'Sector' qu'on renomme).
+    Load the sector mapping for each ticker.
+
+    Expected CSV structure:
+    - Either columns ('ticker', 'sector')
+    - Or ('Ticker', 'Sector'), which are renamed accordingly.
     """
-    print("\n📂 Chargement des secteurs...")
+    print("\nLoading sector mapping...")
     sector_df = pd.read_csv(filepath)
 
-    # Harmonisation des noms de colonnes possibles
+    # Harmonize potential column names
     rename_cols = {}
     if "Ticker" in sector_df.columns:
         rename_cols["Ticker"] = "ticker"
@@ -187,5 +210,6 @@ def load_sector_mapping(filepath="data/raw/sector_mapping.csv"):
     if rename_cols:
         sector_df = sector_df.rename(columns=rename_cols)
 
-    print(f"   - {sector_df.shape[0]} mappings trouvés")
+    print(f"   - {sector_df.shape[0]} ticker–sector mappings loaded")
     return sector_df
+git add src/data_loader.py

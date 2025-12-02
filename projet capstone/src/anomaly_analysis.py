@@ -1,14 +1,16 @@
 # src/anomaly_analysis.py
 
 import os
+from typing import List, Tuple
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from scipy import stats
-import matplotlib.pyplot as plt
 import seaborn as sns
+from scipy import stats
 
-# Liste des colonnes d’anomalies qu’on analyse
-ANOMALY_COLS = [
+# List of anomaly indicator columns used in the analysis
+ANOMALY_COLS: List[str] = [
     "pre_holiday",
     "turn_of_month",
     "sell_in_may",
@@ -18,14 +20,18 @@ ANOMALY_COLS = [
     "is_first_day_quarter",
 ]
 
+# ---------------------------------------------------------------------------
+# Helper functions
+# ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def ensure_excess_return(df: pd.DataFrame) -> pd.DataFrame:
     """
-    S'assure qu'on a une colonne 'excess_return' = daily_return - market_return.
+    Ensure that the DataFrame contains an 'excess_return' column
+    defined as daily_return - market_return.
+
+    If the column already exists, the input is returned unchanged.
+    If daily_return or market_return are missing, an error is raised.
     """
     df = df.copy()
     if "excess_return" in df.columns:
@@ -36,15 +42,18 @@ def ensure_excess_return(df: pd.DataFrame) -> pd.DataFrame:
         return df
 
     raise ValueError(
-        "Impossible de calculer 'excess_return' : "
-        "colonnes 'daily_return' et 'market_return' manquantes."
+        "Unable to compute 'excess_return': "
+        "columns 'daily_return' and 'market_return' are required."
     )
 
 
 def t_test_difference(sample_anom: pd.Series, sample_non: pd.Series) -> float:
     """
-    t-stat pour la différence de moyennes entre jours anomalie et jours normaux.
-    Si on n'a pas assez d'observations, renvoie NaN.
+    Compute the t-statistic for the difference in means between two samples:
+    anomaly days vs non-anomaly days.
+
+    If there are fewer than 5 observations in one of the samples,
+    the function returns NaN.
     """
     sample_anom = sample_anom.dropna()
     sample_non = sample_non.dropna()
@@ -57,55 +66,64 @@ def t_test_difference(sample_anom: pd.Series, sample_non: pd.Series) -> float:
 
 
 # ---------------------------------------------------------------------------
-# 1. Statistiques globales par anomalie
+# 1. Global statistics per anomaly
 # ---------------------------------------------------------------------------
 
-def compute_global_anomaly_stats(df: pd.DataFrame,
-                                 anomaly_cols=ANOMALY_COLS) -> pd.DataFrame:
-    """
-    Pour chaque anomalie :
-      - nb d'observations en anomalie / hors anomalie
-      - rendement moyen excédentaire (excess_return) les jours d'anomalie
-      - idem jours normaux
-      - différence des deux
-      - t-stat (test de Student)
-    """
 
+def compute_global_anomaly_stats(
+    df: pd.DataFrame, anomaly_cols: List[str] = ANOMALY_COLS
+) -> pd.DataFrame:
+    """
+    Compute global statistics for each anomaly indicator.
+
+    For each anomaly dummy column, the function reports:
+    - Number of observations on anomaly vs non-anomaly days
+    - Mean excess return on anomaly days
+    - Mean excess return on non-anomaly days
+    - Difference in means (anomaly - non-anomaly)
+    - t-statistic for the difference in means
+    """
     rows = []
     for col in anomaly_cols:
         mask = df[col] == 1
 
         excess_anom = df.loc[mask, "excess_return"]
-        excess_non  = df.loc[~mask, "excess_return"]
+        excess_non = df.loc[~mask, "excess_return"]
 
         mean_anom = excess_anom.mean()
-        mean_non  = excess_non.mean()
-        diff      = mean_anom - mean_non
-        t_stat    = t_test_difference(excess_anom, excess_non)
+        mean_non = excess_non.mean()
+        diff = mean_anom - mean_non
+        t_stat = t_test_difference(excess_anom, excess_non)
 
-        rows.append({
-            "anomaly": col,
-            "n_anomaly": int(mask.sum()),
-            "n_non_anomaly": int((~mask).sum()),
-            "mean_excess_anomaly": mean_anom,
-            "mean_excess_non_anomaly": mean_non,
-            "diff": diff,
-            "t_stat": t_stat,
-        })
+        rows.append(
+            {
+                "anomaly": col,
+                "n_anomaly": int(mask.sum()),
+                "n_non_anomaly": int((~mask).sum()),
+                "mean_excess_anomaly": mean_anom,
+                "mean_excess_non_anomaly": mean_non,
+                "diff": diff,
+                "t_stat": t_stat,
+            }
+        )
 
     global_df = pd.DataFrame(rows)
     return global_df.sort_values("anomaly").reset_index(drop=True)
 
 
 # ---------------------------------------------------------------------------
-# 2. Statistiques par ticker (quels titres profitent de chaque anomalie ?)
+# 2. Statistics by ticker
 # ---------------------------------------------------------------------------
 
-def compute_ticker_anomaly_stats(df: pd.DataFrame,
-                                 anomaly_cols=ANOMALY_COLS) -> pd.DataFrame:
+
+def compute_ticker_anomaly_stats(
+    df: pd.DataFrame, anomaly_cols: List[str] = ANOMALY_COLS
+) -> pd.DataFrame:
     """
-    Pour chaque anomalie et pour chaque ticker:
-      - rendement moyen excédentaire les jours d'anomalie
+    Compute anomaly-related statistics at the ticker level.
+
+    For each anomaly and each ticker, the function computes:
+    - Mean excess return on anomaly days
     """
     all_rows = []
 
@@ -118,39 +136,51 @@ def compute_ticker_anomaly_stats(df: pd.DataFrame,
 
         tmp = (
             sub.groupby("ticker")["excess_return"]
-               .mean()
-               .reset_index()
-               .rename(columns={"excess_return": "mean_excess_return_anomaly_days"})
+            .mean()
+            .reset_index()
+            .rename(
+                columns={"excess_return": "mean_excess_return_anomaly_days"}
+            )
         )
         tmp["anomaly"] = col
         all_rows.append(tmp)
 
     if not all_rows:
-        return pd.DataFrame(columns=["ticker", "anomaly", "mean_excess_return_anomaly_days"])
+        return pd.DataFrame(
+            columns=["ticker", "anomaly", "mean_excess_return_anomaly_days"]
+        )
 
     ticker_df = pd.concat(all_rows, ignore_index=True)
-    # On ordonne pour que ce soit lisible dans Excel
     ticker_df = ticker_df[["ticker", "anomaly", "mean_excess_return_anomaly_days"]]
-    return ticker_df.sort_values(["anomaly", "mean_excess_return_anomaly_days"],
-                                 ascending=[True, False]).reset_index(drop=True)
+
+    return ticker_df.sort_values(
+        ["anomaly", "mean_excess_return_anomaly_days"],
+        ascending=[True, False],
+    ).reset_index(drop=True)
 
 
 # ---------------------------------------------------------------------------
-# 3. Statistiques par secteur (effet par secteur)
+# 3. Statistics by sector
 # ---------------------------------------------------------------------------
 
-def compute_sector_anomaly_stats(df: pd.DataFrame,
-                                 anomaly_cols=ANOMALY_COLS) -> pd.DataFrame:
+
+def compute_sector_anomaly_stats(
+    df: pd.DataFrame, anomaly_cols: List[str] = ANOMALY_COLS
+) -> pd.DataFrame:
     """
-    Pour chaque anomalie et chaque secteur:
-      - nb d'observations avec anomalie / hors anomalie
-      - rendements moyens excédentaires
-      - différence
-      - t-stat
-    Nécessite une colonne 'sector' dans df.
+    Compute anomaly-related statistics at the sector level.
+
+    For each anomaly and each sector, the function reports:
+    - Number of observations on anomaly vs non-anomaly days
+    - Mean excess return on anomaly days
+    - Mean excess return on non-anomaly days
+    - Difference in means
+    - t-statistic for the difference in means
+
+    Requires the DataFrame to contain a 'sector' column.
     """
     if "sector" not in df.columns:
-        raise ValueError("La colonne 'sector' est manquante dans df.")
+        raise ValueError("Column 'sector' is missing from the DataFrame.")
 
     rows = []
 
@@ -158,70 +188,85 @@ def compute_sector_anomaly_stats(df: pd.DataFrame,
         for sector, g in df.groupby("sector"):
             mask = g[col] == 1
             if mask.sum() < 5:
-                # Pas assez de jours d'anomalie dans ce secteur -> on saute
+                # Not enough anomaly days in this sector
                 continue
 
             excess_anom = g.loc[mask, "excess_return"]
-            excess_non  = g.loc[~mask, "excess_return"]
+            excess_non = g.loc[~mask, "excess_return"]
 
             mean_anom = excess_anom.mean()
-            mean_non  = excess_non.mean()
-            diff      = mean_anom - mean_non
-            t_stat    = t_test_difference(excess_anom, excess_non)
+            mean_non = excess_non.mean()
+            diff = mean_anom - mean_non
+            t_stat = t_test_difference(excess_anom, excess_non)
 
-            rows.append({
-                "anomaly": col,
-                "sector": sector,
-                "n_anomaly": int(mask.sum()),
-                "n_non_anomaly": int((~mask).sum()),
-                "mean_excess_anomaly": mean_anom,
-                "mean_excess_non_anomaly": mean_non,
-                "diff": diff,
-                "t_stat": t_stat,
-            })
+            rows.append(
+                {
+                    "anomaly": col,
+                    "sector": sector,
+                    "n_anomaly": int(mask.sum()),
+                    "n_non_anomaly": int((~mask).sum()),
+                    "mean_excess_anomaly": mean_anom,
+                    "mean_excess_non_anomaly": mean_non,
+                    "diff": diff,
+                    "t_stat": t_stat,
+                }
+            )
 
     if not rows:
-        return pd.DataFrame(columns=[
-            "anomaly", "sector", "n_anomaly", "n_non_anomaly",
-            "mean_excess_anomaly", "mean_excess_non_anomaly",
-            "diff", "t_stat"
-        ])
+        return pd.DataFrame(
+            columns=[
+                "anomaly",
+                "sector",
+                "n_anomaly",
+                "n_non_anomaly",
+                "mean_excess_anomaly",
+                "mean_excess_non_anomaly",
+                "diff",
+                "t_stat",
+            ]
+        )
 
     sector_df = pd.DataFrame(rows)
     return sector_df.sort_values(["anomaly", "sector"]).reset_index(drop=True)
 
 
 # ---------------------------------------------------------------------------
-# 4. Graphiques
+# 4. Plots
 # ---------------------------------------------------------------------------
 
-def plot_global_anomaly_stats(global_df: pd.DataFrame, out_dir: str):
+
+def plot_global_anomaly_stats(global_df: pd.DataFrame, out_dir: str) -> None:
     """
-    Barplot de la différence de rendement (diff) par anomalie.
+    Create a bar plot of the mean excess-return difference (anomaly vs normal)
+    for each anomaly indicator.
     """
     if global_df.empty:
         return
+
+    os.makedirs(out_dir, exist_ok=True)
 
     plt.figure(figsize=(8, 4))
     plt.bar(global_df["anomaly"], global_df["diff"])
     plt.axhline(0, color="black", linewidth=1)
     plt.xticks(rotation=45, ha="right")
-    plt.ylabel("Différence moyenne\n(excess_return anomaly - normal)")
-    plt.title("Impact moyen des anomalies sur le rendement excédentaire")
+    plt.ylabel("Mean difference\n(excess return: anomaly - normal)")
+    plt.title("Average impact of anomalies on excess returns")
     plt.tight_layout()
 
     path = os.path.join(out_dir, "global_anomaly_diff.png")
     plt.savefig(path, dpi=150)
     plt.close()
-    print(f"📊 Graphique global sauvegardé : {path}")
+    print(f"Global anomaly bar plot saved to: {path}")
 
 
-def plot_sector_heatmap(sector_df: pd.DataFrame, out_dir: str):
+def plot_sector_heatmap(sector_df: pd.DataFrame, out_dir: str) -> None:
     """
-    Heatmap des diff par secteur × anomalie.
+    Create a heatmap of excess-return differences by sector and anomaly.
     """
     if sector_df.empty:
         return
+
+    os.makedirs(out_dir, exist_ok=True)
 
     pivot = sector_df.pivot(index="sector", columns="anomaly", values="diff")
 
@@ -230,92 +275,102 @@ def plot_sector_heatmap(sector_df: pd.DataFrame, out_dir: str):
         pivot,
         cmap="coolwarm",
         center=0,
-        annot=False
+        annot=False,
     )
-    plt.title("Différence de rendement excédentaire par secteur et anomalie")
-    plt.ylabel("Secteur")
-    plt.xlabel("Anomalie")
+    plt.title("Excess return differences by sector and anomaly")
+    plt.ylabel("Sector")
+    plt.xlabel("Anomaly")
     plt.tight_layout()
 
     path = os.path.join(out_dir, "sector_anomaly_heatmap.png")
     plt.savefig(path, dpi=150)
     plt.close()
-    print(f"📊 Heatmap secteurs sauvegardée : {path}")
+    print(f"Sector anomaly heatmap saved to: {path}")
 
 
 # ---------------------------------------------------------------------------
-# 5. Fonction principale appelée depuis main.py
+# 5. Main function called from main.py
 # ---------------------------------------------------------------------------
 
-def run_anomaly_return_analysis(df: pd.DataFrame,
-                                results_dir: str = "results/anomalies"):
-    """
-    1) Global : effet moyen de chaque anomalie sur le rendement excédentaire
-    2) Ticker : quels titres profitent le plus de chaque anomalie
-    3) Secteur : quels secteurs bénéficient le plus de chaque anomalie
-    4) Graphiques : barplot global + heatmap secteurs
-    """
 
+def run_anomaly_return_analysis(
+    df: pd.DataFrame, results_dir: str = "results/anomalies"
+) -> None:
+    """
+    Run the full anomaly return analysis workflow:
+
+    1) Global impact of each anomaly on excess returns.
+    2) Ticker-level statistics: which stocks benefit most from each anomaly.
+    3) Sector-level statistics: which sectors benefit most from each anomaly.
+    4) Plots: global bar plot + sector heatmap.
+    """
     os.makedirs(results_dir, exist_ok=True)
     plots_dir = os.path.join(results_dir, "plots")
     os.makedirs(plots_dir, exist_ok=True)
 
     df = ensure_excess_return(df)
 
-    # ---- Global
+    # Global statistics
     global_stats = compute_global_anomaly_stats(df)
     global_path = os.path.join(results_dir, "anomaly_global_returns.xlsx")
     global_stats.to_excel(global_path, index=False)
-    print(f"💾 Statistiques globales sauvegardées : {global_path}")
+    print(f"Global anomaly statistics saved to: {global_path}")
 
-    # ---- Par ticker
+    # Ticker-level statistics
     ticker_stats = compute_ticker_anomaly_stats(df)
     ticker_path = os.path.join(results_dir, "anomaly_ticker_returns.xlsx")
     ticker_stats.to_excel(ticker_path, index=False)
-    print(f"💾 Statistiques par ticker sauvegardées : {ticker_path}")
+    print(f"Ticker-level anomaly statistics saved to: {ticker_path}")
 
-    # ---- Par secteur
+    # Sector-level statistics
     try:
         sector_stats = compute_sector_anomaly_stats(df)
         sector_path = os.path.join(results_dir, "anomaly_sector_returns.xlsx")
         sector_stats.to_excel(sector_path, index=False)
-        print(f"💾 Statistiques par secteur sauvegardées : {sector_path}")
+        print(f"Sector-level anomaly statistics saved to: {sector_path}")
     except ValueError as e:
-        print(f"⚠️ Analyse sectorielle non effectuée : {e}")
+        print(f"Sector-level analysis not performed: {e}")
         sector_stats = pd.DataFrame()
 
-    # ---- Graphiques
+    # Plots
     plot_global_anomaly_stats(global_stats, plots_dir)
     if not sector_stats.empty:
         plot_sector_heatmap(sector_stats, plots_dir)
 
-    print("✅ Analyse des anomalies (rendements + secteurs + graphiques) terminée.")
+    print("Anomaly return analysis completed.")
 
-def analyze_sectors(df, save_path="results/anomalies/anomaly_sector_returns.xlsx"):
+
+def analyze_sectors(
+    df: pd.DataFrame,
+    save_path: str = "results/anomalies/anomaly_sector_summary.xlsx",
+) -> None:
     """
-    Analyse les anomalies par secteur :
-    - moyenne des rendements
-    - comparaison secteurs
-    - ranking
+    Compute a simple sector-level summary:
+
+    - Average daily return
+    - Volatility of daily returns
+    - Number of observations
+
+    This is intended as a descriptive complement to the anomaly analysis.
     """
-    print("\n📊 Analyse sectorielle...")
+    print("\nRunning sector-level descriptive analysis...")
 
     if "sector" not in df.columns:
-        print("⚠️ Colonne 'sector' absente → analyse ignorée.")
+        print("Column 'sector' is missing; sector analysis is skipped.")
         return
 
     sector_stats = (
-        df.groupby(["sector"])
-          .agg(
-              avg_return=("daily_return", "mean"),
-              volatility=("daily_return", "std"),
-              count=("daily_return", "size")
-          )
-          .sort_values(by="avg_return", ascending=False)
+        df.groupby("sector")
+        .agg(
+            avg_return=("daily_return", "mean"),
+            volatility=("daily_return", "std"),
+            count=("daily_return", "size"),
+        )
+        .sort_values(by="avg_return", ascending=False)
     )
 
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     sector_stats.to_excel(save_path)
 
-    print(f"   ➤ Analyse sectorielle sauvegardée dans : {save_path}")
+    print(f"Sector-level summary saved to: {save_path}")
     print(sector_stats)
