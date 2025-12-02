@@ -17,6 +17,7 @@ from imblearn.over_sampling import SMOTE
 from typing import List, Tuple
 import numpy as np
 
+
 # --------------------------------------------------------------------
 # 1. Split temporel (train = 2010–2018 / test = 2019–2024+)
 # --------------------------------------------------------------------
@@ -74,6 +75,7 @@ FEATURE_COLS = [
     "is_first_day_quarter",
 ]
 
+
 def apply_smote(
     X_train: pd.DataFrame, y_train: pd.Series, random_state: int = 42
 ) -> Tuple[pd.DataFrame, pd.Series]:
@@ -84,6 +86,7 @@ def apply_smote(
         f"(proportion classe 1 : avant {y_train.mean():.3f}, après {y_train_res.mean():.3f})"
     )
     return X_train_res, y_train_res
+
 
 def print_classification_results(
     model_name: str,
@@ -129,9 +132,8 @@ def run_logistic_regression(df: pd.DataFrame) -> LogisticRegression:
     y_proba = model.predict_proba(X_test)[:, 1]
 
     print_classification_results(
-    "LOGISTIC REGRESSION", y_test, y_pred, y_proba
-)
-
+        "LOGISTIC REGRESSION", y_test, y_pred, y_proba
+    )
 
     return model
 
@@ -162,18 +164,18 @@ def run_random_forest(df: pd.DataFrame) -> RandomForestClassifier:
     # Pour l'AUC, on prend les proba si possible
     try:
         y_proba = model.predict_proba(X_test)[:, 1]
-        auc = roc_auc_score(y_test, y_proba)
     except Exception:
-        auc = float("nan")
+        y_proba = None
 
     print_classification_results(
-    "RANDOM FOREST", y_test, y_pred, y_proba if "y_proba" in locals() else None
-)
-
+        "RANDOM FOREST", y_test, y_pred, y_proba
+    )
 
     print("\n🌟 Variable importance :")
     for name, score in sorted(
-        zip(FEATURE_COLS, model.feature_importances_), key=lambda x: x[1], reverse=True
+        zip(FEATURE_COLS, model.feature_importances_),
+        key=lambda x: x[1],
+        reverse=True,
     ):
         print(f"{name:<22} : {score:.3f}")
 
@@ -218,6 +220,7 @@ def run_gradient_boosting(df: pd.DataFrame) -> GradientBoostingClassifier:
         "GRADIENT BOOSTING", y_test, y_pred, y_proba
     )
 
+    print("\n🌟 Variable importance :")
     for name, score in sorted(
         zip(FEATURE_COLS, best_model.feature_importances_),
         key=lambda x: x[1],
@@ -226,7 +229,6 @@ def run_gradient_boosting(df: pd.DataFrame) -> GradientBoostingClassifier:
         print(f"{name:<22} : {score:.3f}")
 
     return best_model
-
 
 
 # --------------------------------------------------------------------
@@ -255,13 +257,11 @@ def run_neural_network(df: pd.DataFrame) -> MLPClassifier:
 
     try:
         y_proba = mlp.predict_proba(X_test)[:, 1]
-        auc = roc_auc_score(y_test, y_proba)
     except Exception:
-        auc = float("nan")
+        y_proba = None
 
     print_classification_results(
-    "NEURAL NETWORK", y_test, y_pred, y_proba if "y_proba" in locals() else None
-)
-
+        "NEURAL NETWORK", y_test, y_pred, y_proba
+    )
 
     return mlp
