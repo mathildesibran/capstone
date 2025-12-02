@@ -2,3 +2,10 @@
 lectures/
 virtual_documents/
 examples/
+.nuvolos/
+copilot_ext/
+fig/
+python_refresher/
+.bashrc
+PNoz.dat
+sp_und.csv
