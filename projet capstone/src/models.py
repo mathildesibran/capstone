@@ -74,6 +74,16 @@ FEATURE_COLS = [
     "is_first_day_quarter",
 ]
 
+def apply_smote(
+    X_train: pd.DataFrame, y_train: pd.Series, random_state: int = 42
+) -> Tuple[pd.DataFrame, pd.Series]:
+    smote = SMOTE(random_state=random_state)
+    X_train_res, y_train_res = smote.fit_resample(X_train, y_train)
+    print(
+        f"📊 SMOTE appliqué : train size {len(y_train)} → {len(y_train_res)} "
+        f"(proportion classe 1 : avant {y_train.mean():.3f}, après {y_train_res.mean():.3f})"
+    )
+    return X_train_res, y_train_res
 
 # --------------------------------------------------------------------
 # 3. Logistic Regression + SMOTE
@@ -89,12 +99,7 @@ def run_logistic_regression(df: pd.DataFrame) -> LogisticRegression:
     print(f"❌ Baseline (always majority class) accuracy : {baseline_acc:.4f}")
 
     # ---------- SMOTE (sur l'échantillon d'entraînement uniquement) ----------
-    smote = SMOTE(random_state=42)
-    X_train_res, y_train_res = smote.fit_resample(X_train, y_train)
-    print(
-        f"📊 SMOTE appliqué : train size {len(y_train)} → {len(y_train_res)} "
-        f"(proportion classe 1 : avant {y_train.mean():.3f}, après {y_train_res.mean():.3f})"
-    )
+    X_train_res, y_train_res = apply_smote(X_train, y_train)
     # -------------------------------------------------------------------------
 
     model = LogisticRegression(max_iter=1000)
@@ -124,12 +129,7 @@ def run_random_forest(df: pd.DataFrame) -> RandomForestClassifier:
     X_train, X_test, y_train, y_test = temporal_train_test_split(df, FEATURE_COLS)
 
     # ---------- SMOTE ----------
-    smote = SMOTE(random_state=42)
-    X_train_res, y_train_res = smote.fit_resample(X_train, y_train)
-    print(
-        f"📊 SMOTE appliqué : train size {len(y_train)} → {len(y_train_res)} "
-        f"(proportion classe 1 : avant {y_train.mean():.3f}, après {y_train_res.mean():.3f})"
-    )
+    X_train_res, y_train_res = apply_smote(X_train, y_train)
     # ---------------------------
 
     model = RandomForestClassifier(
@@ -176,11 +176,7 @@ def run_gradient_boosting(df: pd.DataFrame) -> GradientBoostingClassifier:
     X_train, X_test, y_train, y_test = temporal_train_test_split(df, FEATURE_COLS)
 
     # ---------- SMOTE ----------
-    smote = SMOTE(random_state=42)
-    X_train_res, y_train_res = smote.fit_resample(X_train, y_train)
-    print(
-        f"📊 SMOTE appliqué : train size {len(y_train)} → {len(y_train_res)} "
-        f"(proportion classe 1 : avant {y_train.mean():.3f}, après {y_train_res.mean():.3f})"
+    X_train_res, y_train_res = apply_smote(X_train, y_train)
     )
     # ---------------------------
 
@@ -234,12 +230,7 @@ def run_neural_network(df: pd.DataFrame) -> MLPClassifier:
     X_train, X_test, y_train, y_test = temporal_train_test_split(df, FEATURE_COLS)
 
     # ---------- SMOTE ----------
-    smote = SMOTE(random_state=42)
-    X_train_res, y_train_res = smote.fit_resample(X_train, y_train)
-    print(
-        f"📊 SMOTE appliqué : train size {len(y_train)} → {len(y_train_res)} "
-        f"(proportion classe 1 : avant {y_train.mean():.3f}, après {y_train_res.mean():.3f})"
-    )
+    X_train_res, y_train_res = apply_smote(X_train, y_train)
     # ---------------------------
 
     mlp = MLPClassifier(
