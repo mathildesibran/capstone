@@ -1,0 +1,17 @@
+name: capstone-env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - numpy
+  - pandas
+  - scikit-learn
+  - matplotlib
+  - seaborn
+  - scipy
+  - openpyxl
+  - yfinance
+  - imbalanced-learn
+  - holidays
+  - xgboost
+  - joblib

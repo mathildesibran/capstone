@@ -1,0 +1,289 @@
+% Advanced Programming 2025 - Project Report
+% HEC Lausanne / UNIL
+
+\documentclass[11pt,a4paper]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+\usepackage{fancyhdr}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+
+% Header and footer
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Advanced Programming 2025}
+\lhead{Final Project Report}
+\rfoot{Page \thepage}
+
+% Title page
+\title{
+    \Large \textbf{Advanced Programming 2025} \\
+    \vspace{0.5cm}
+    \LARGE \textbf{Anomalies calendaires et machine learning pour la prédiction des rendements boursiers journaliers} \\
+    \vspace{0.3cm}
+    \large Final Project Report
+}
+\author{
+    Mathilde Sibran \\
+    \texttt{mathilde.sibran@unil.ch} \\
+    Student ID: 21682265
+}
+\date{\today}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+
+% ================= ABSTRACT =================
+
+\begin{abstract}
+\noindent
+Ce projet étudie si les anomalies calendaires bien connues des marchés financiers
+peuvent être exploitées pour prédire la direction des rendements excédentaires
+journaliers des actions à l’aide de modèles de machine learning. À partir de données
+de prix quotidiens pour un sous-ensemble d’actions du S\&P~500 sur la période 2010–2025,
+un jeu de données propre de 40 actions liquides est constitué. Les rendements des
+actions et du marché sont calculés, et de nombreuses variables calendaires et
+techniques sont construites.
+
+Une analyse descriptive est d’abord menée afin de mesurer l’impact des anomalies,
+à la fois globalement, par action et par secteur. Plusieurs modèles supervisés sont
+ensuite entraînés — régression logistique, random forest, gradient boosting, XGBoost
+et réseau de neurones — en utilisant une séparation temporelle apprentissage/test.
+
+Les résultats montrent que, bien que la plupart des modèles présentent un pouvoir
+prédictif limité, le modèle Random Forest surperforme nettement les autres avec une
+accuracy supérieure à 62\% et un ROC AUC proche de 0.67. Ces résultats suggèrent que
+les modèles non linéaires peuvent partiellement exploiter de faibles signaux
+liés aux anomalies calendaires, même si la prédictibilité globale reste modérée.
+\end{abstract}
+
+\newpage
+\tableofcontents
+\newpage
+
+% ================= INTRODUCTION =================
+
+\section{Introduction}
+
+Les marchés financiers sont généralement considérés comme relativement efficients,
+ce qui implique que les stratégies de trading simples ne devraient pas permettre
+de battre durablement le marché. Pourtant, de nombreuses études empiriques ont mis
+en évidence l’existence d’anomalies calendaires, telles que l’effet jour de la
+semaine, l’effet janvier ou encore l’effet pré-férié.
+
+La question centrale de ce projet est la suivante :
+
+\begin{quote}
+Les anomalies calendaires et des indicateurs techniques simples peuvent-ils être utilisés
+avec le machine learning pour prédire le signe du rendement excédentaire journalier
+des actions américaines ?
+\end{quote}
+
+Les objectifs du projet sont :
+\begin{itemize}
+    \item construire un jeu de données propre de prix quotidiens ;
+    \item analyser l’impact des anomalies calendaires ;
+    \item entraîner et comparer plusieurs modèles de machine learning ;
+    \item proposer une chaîne de traitement entièrement reproductible en Python.
+\end{itemize}
+
+% ================= LITTERATURE =================
+
+\section{Revue de littérature}
+
+Les anomalies calendaires telles que l’effet lundi, l’effet janvier ou l’effet
+pré-férié ont été largement étudiées en finance empirique. Bien que leur significativité
+statistique soit souvent confirmée, leur ampleur économique reste en général très
+limitée.
+
+Parallèlement, de nombreuses études ont appliqué des méthodes de machine learning
+à la prévision des rendements boursiers. Toutefois, la majorité des résultats montre
+que les rendements journaliers sont extrêmement difficiles à prédire de manière fiable.
+
+Ce travail se situe à l’intersection de ces deux approches, en combinant anomalies
+calendaires et modèles supervisés de machine learning.
+
+% ================= DATA =================
+
+\section{Description des données}
+
+Le jeu de données est composé de prix de clôture journaliers d’actions américaines
+sur la période 2010–2025. Après nettoyage, un sous-ensemble final de 40 actions est
+sélectionné sur la base de critères de disponibilité des données et de liquidité.
+
+Les rendements du marché sont mesurés à partir de l’indice S\&P~500. Un fichier de
+correspondance permet d’assigner chaque action à son secteur économique. Le jeu de
+données final contient environ 160 000 observations journalières.
+
+% ================= FEATURES =================
+
+\section{Variables explicatives et variable cible}
+
+Pour chaque observation action–jour :
+\begin{itemize}
+    \item rendement journalier de l’action,
+    \item rendement du marché,
+    \item rendement excédentaire.
+\end{itemize}
+
+La variable cible binaire vaut 1 si le rendement excédentaire du lendemain est positif,
+et 0 sinon.
+
+Variables calendaires :
+\begin{itemize}
+    \item jour de la semaine,
+    \item mois,
+    \item fin de mois,
+    \item Sell-in-May,
+    \item pré-férié,
+    \item Noël, Nouvel An, Thanksgiving,
+    \item premier jour de chaque trimestre.
+\end{itemize}
+
+Indicateurs techniques :
+\begin{itemize}
+    \item momentum à 5, 10 et 20 jours,
+    \item volatilité glissante à 10 et 20 jours,
+    \item moyennes mobiles à 20 et 50 jours,
+    \item prix relatif à la moyenne mobile.
+\end{itemize}
+
+Des variables muettes de secteur sont ajoutées.
+
+% ================= MODELS =================
+
+\section{Modèles et méthodologie}
+
+Séparation temporelle :
+\begin{itemize}
+    \item Entraînement : 2010–2018
+    \item Test : 2019–2025
+\end{itemize}
+
+Modèles utilisés :
+\begin{itemize}
+    \item Régression logistique
+    \item Random Forest
+    \item Gradient Boosting
+    \item XGBoost
+    \item Réseau de neurones (MLP)
+\end{itemize}
+
+Métriques :
+\begin{itemize}
+    \item Accuracy
+    \item ROC AUC
+\end{itemize}
+
+% ================= IMPLEMENTATION =================
+
+\section{Implémentation}
+
+Le projet est entièrement codé en Python selon une structure modulaire.
+
+\subsection{Architecture}
+\begin{itemize}
+    \item \texttt{main.py}
+    \item \texttt{data\_loader.py}
+    \item \texttt{features.py}
+    \item \texttt{anomalies.py}
+    \item \texttt{models.py}
+\end{itemize}
+
+\subsection{Prétraitement}
+Chargement des données, calcul des rendements, intégration du secteur.
+
+\subsection{Variables}
+Anomalies calendaires, momentum, volatilité, moyennes mobiles, secteurs.
+
+\subsection{Machine learning}
+Standardisation via \texttt{Pipeline}, entraînement automatisé, évaluation Accuracy \& AUC.
+
+\subsection{Automatisation}
+Un simple \texttt{python main.py} exécute l’ensemble du pipeline.
+
+% ================= CODEBASE =================
+
+\section{Codebase et reproductibilité}
+
+Le projet est entièrement reproductible via un dépôt Git.
+
+Structure :
+\begin{itemize}
+    \item \texttt{main.py}
+    \item \texttt{src/}
+    \item \texttt{data/}
+    \item \texttt{results/}
+    \item \texttt{environment.yml}
+    \item \texttt{README.md}
+\end{itemize}
+
+Dépendances :
+\begin{itemize}
+    \item pandas, numpy
+    \item scikit-learn
+    \item xgboost
+\end{itemize}
+
+Commande unique :
+\begin{center}
+\texttt{python main.py}
+\end{center}
+
+% ================= RESULTS =================
+
+\section{Résultats}
+
+\subsection{Performance des modèles}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+Modèle & Accuracy & ROC AUC \\
+\hline
+Régression Logistique & 0.513 & 0.504 \\
+Random Forest & \textbf{0.624} & \textbf{0.670} \\
+Gradient Boosting & 0.533 & 0.546 \\
+XGBoost & 0.548 & 0.568 \\
+Réseau de neurones & 0.537 & 0.553 \\
+\hline
+\end{tabular}
+\caption{Performance finale des modèles}
+\end{table}
+
+Le modèle Random Forest surperforme nettement les autres.
+
+% ================= LIMITES =================
+
+\section{Limites}
+
+Les rendements journaliers sont extrêmement bruités. Les données fondamentales,
+macroéconomiques et de sentiment ne sont pas intégrées.
+
+% ================= FUTURE WORK =================
+
+\section{Perspectives}
+
+Ajout de données intrajournalières, variables macroéconomiques, analyse de portefeuilles,
+modèles LSTM.
+
+% ================= CONCLUSION =================
+
+\section{Conclusion}
+
+Les anomalies calendaires ne permettent pas à elles seules de prédire efficacement
+les rendements journaliers. Le Random Forest extrait néanmoins un signal partiel.
+
+\end{document}
