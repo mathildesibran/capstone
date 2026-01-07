@@ -17,33 +17,33 @@ descriptive anomaly analysis with supervised machine learning models.
 
 ## Project Structure
 
+```text
 capstone/
 ├── README.md
 ├── PROPOSAL.md
 ├── environment.yml
 ├── requirements.txt
-├── main.py # Main entry point
+├── main.py                  # Main entry point
 │
 ├── src/
-│ ├── init.py
-│ ├── data_loader.py
-│ ├── features.py
-│ ├── anomalies.py
-│ ├── anomaly_analysis.py
-│ ├── models.py
-│ └── visualization.py
+│   ├── __init__.py
+│   ├── data_loader.py
+│   ├── features.py
+│   ├── anomalies.py
+│   ├── anomaly_analysis.py
+│   ├── models.py
+│   └── visualization.py
 │
-├── scripts/ # One-time data preparation scripts
-│ ├── reduce_to_40_tickers.py
-│ └── generate_sector_mapping_from_excel.py
+├── scripts/                 # One-time data preparation scripts
+│   ├── reduce_to_40_tickers.py
+│   └── generate_sector_mapping_from_excel.py
 │
 ├── data/
-│ └── raw/
+│   └── raw/
 │
-├── results/ # Tables, figures, and model outputs
+├── results/                 # Tables, figures, and model outputs
 └── notebooks/
 
----
 
 ## Environment Setup
 
