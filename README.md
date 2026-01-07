@@ -45,19 +45,21 @@ capstone/
 └── notebooks/
 
 
+```markdown
 ## Environment Setup
 
-### Option  — Conda 
+### Option — Conda
 
 ```bash
 conda env create -f environment.yml
 conda activate capstone-env
-
-
 Data Preparation (One-Time)
-
 The following scripts were executed once to prepare the dataset and are not
 part of the main pipeline:
+
+bash
+Copier le code
+
 
 python scripts/generate_sector_mapping_from_excel.py
 python scripts/reduce_to_40_tickers.py
