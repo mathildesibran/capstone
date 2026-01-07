@@ -3,8 +3,8 @@
 ## Research Question
 
 This project investigates whether selected **calendar-based market anomalies**
-generate systematic excess returns and exhibit predictive power for the **direction
-of next-day excess stock returns** at three levels:
+generate systematic excess returns and exhibit predictive power for the
+**direction of next-day excess stock returns** at three levels:
 
 - Market level  
 - Individual stock level  
@@ -125,3 +125,8 @@ main.py is the single entry point of the project.
 Scripts in scripts/ are utility scripts and are not imported by the pipeline.
 
 The project is fully reproducible using the provided environment files.
+
+markdown
+Copier le code
+
+---
