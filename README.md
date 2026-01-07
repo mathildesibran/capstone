@@ -6,9 +6,9 @@ This project investigates whether selected **calendar-based market anomalies**
 generate systematic excess returns and exhibit predictive power for the **direction
 of next-day excess stock returns** at three levels:
 
-- market level,
-- individual stock level,
-- sector level.
+- Market level  
+- Individual stock level  
+- Sector level  
 
 The analysis focuses on a panel of liquid U.S. equities and combines
 descriptive anomaly analysis with supervised machine learning models.
@@ -17,31 +17,36 @@ descriptive anomaly analysis with supervised machine learning models.
 
 ## Project Structure
 
-your-project/
-├── README.md               
-├── PROPOSAL.md             
-├── environment.yml        
-├── requirements.txt        
-├── main.py                 
+capstone/
+├── README.md
+├── PROPOSAL.md
+├── environment.yml
+├── requirements.txt
+├── main.py # Main entry point
 │
-├── src/                    
-│   ├── __init__.py
-│   ├── data_loader.py      
-│   ├── features.py         
-│   ├── anomalies.py        
-│   ├── models.py           
-│   └── visualization.py  
+├── src/
+│ ├── init.py
+│ ├── data_loader.py
+│ ├── features.py
+│ ├── anomalies.py
+│ ├── anomaly_analysis.py
+│ ├── models.py
+│ └── visualization.py
 │
-├── scripts/                
-│   ├── reduce_to_40_tickers.py
-│   └── generate_sector_mapping_from_excel.py
+├── scripts/ # One-time data preparation scripts
+│ ├── reduce_to_40_tickers.py
+│ └── generate_sector_mapping_from_excel.py
 │
 ├── data/
-│   └── raw/              
+│ └── raw/
 │
-├── results/               
-└── notebooks/             
+├── results/ # Tables, figures, and model outputs
+└── notebooks/
 
+yaml
+Copier le code
+
+---
 
 ## Environment Setup
 
@@ -50,51 +55,73 @@ your-project/
 ```bash
 conda env create -f environment.yml
 conda activate capstone-env
-
 Option 2 — Pip
+bash
+Copier le code
 pip install -r requirements.txt
-
-
 Data Preparation (One-Time)
-The following scripts are executed once to prepare the data and are not part
-of the main pipeline:
+The following scripts were executed once to prepare the dataset and are not
+part of the main pipeline:
 
+bash
+Copier le code
 python scripts/generate_sector_mapping_from_excel.py
 python scripts/reduce_to_40_tickers.py
+They generate the following files in data/raw/:
 
-They generate:
 sector_mapping.csv
+
 market_anomalie_40.xlsx
 
+These files are already included in the repository and do not need to be
+re-generated to run the project.
+
 Running the Project
-To run the full analysis pipeline, execute:
+From the root directory of the repository, run:
+
+bash
+Copier le code
 python main.py
-
-
 This script performs:
-1. Data loading and cleaning
-2. Feature engineering
-3. Calendar anomaly analysis
-4. Machine learning model estimation
-5. Result export and visualization
+
+Data loading and cleaning
+
+Feature engineering
+
+Calendar anomaly analysis
+
+Machine learning model estimation (global and sector-level)
+
+Result export and visualization
+
 All outputs are saved in the results/ directory.
 
-
 Models
-The following supervised models are implemented:
+The following supervised learning models are implemented:
+
 Logistic Regression
+
 Random Forest
+
+Gradient Boosting
+
 XGBoost
+
 Neural Network (MLP)
 
 Models are evaluated using:
-Accuracy
-ROC AUC
-Macro precision, recall, and F1-score
-A strict time-based split is applied to avoid look-ahead bias.
 
+Accuracy
+
+ROC AUC
+
+Macro precision, recall, and F1-score
+
+A strict time-based train/test split is applied to avoid look-ahead bias.
 
 Notes
-The main.py file is the single entry point of the project.
+main.py is the single entry point of the project.
+
 Scripts in scripts/ are utility scripts and are not imported by the pipeline.
+
 The project is fully reproducible using the provided environment files.
