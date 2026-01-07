@@ -53,7 +53,8 @@ capstone/
 conda env create -f environment.yml
 conda activate capstone-env
 
-## Data Preparation (One-Time)
+
+Data Preparation (One-Time)
 
 The following scripts were executed once to prepare the dataset and are not
 part of the main pipeline:
