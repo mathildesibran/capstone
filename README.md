@@ -43,30 +43,24 @@ capstone/
 ├── results/ # Tables, figures, and model outputs
 └── notebooks/
 
-yaml
-Copier le code
-
 ---
 
 ## Environment Setup
 
-### Option 1 — Conda (recommended)
+### Option  — Conda 
 
 ```bash
 conda env create -f environment.yml
 conda activate capstone-env
-Option 2 — Pip
-bash
-Copier le code
-pip install -r requirements.txt
+
 Data Preparation (One-Time)
+
 The following scripts were executed once to prepare the dataset and are not
 part of the main pipeline:
 
-bash
-Copier le code
 python scripts/generate_sector_mapping_from_excel.py
 python scripts/reduce_to_40_tickers.py
+
 They generate the following files in data/raw/:
 
 sector_mapping.csv
@@ -77,11 +71,10 @@ These files are already included in the repository and do not need to be
 re-generated to run the project.
 
 Running the Project
-From the root directory of the repository, run:
 
-bash
-Copier le code
+From the root directory of the repository, run:
 python main.py
+
 This script performs:
 
 Data loading and cleaning
@@ -97,6 +90,7 @@ Result export and visualization
 All outputs are saved in the results/ directory.
 
 Models
+
 The following supervised learning models are implemented:
 
 Logistic Regression
@@ -120,13 +114,9 @@ Macro precision, recall, and F1-score
 A strict time-based train/test split is applied to avoid look-ahead bias.
 
 Notes
+
 main.py is the single entry point of the project.
 
 Scripts in scripts/ are utility scripts and are not imported by the pipeline.
 
 The project is fully reproducible using the provided environment files.
-
-markdown
-Copier le code
-
----
