@@ -23,7 +23,7 @@ capstone/
 ├── PROPOSAL.md
 ├── environment.yml
 ├── requirements.txt
-├── main.py                  # Main entry point
+├── main.py                 
 │
 ├── src/
 │   ├── __init__.py
@@ -34,14 +34,14 @@ capstone/
 │   ├── models.py
 │   └── visualization.py
 │
-├── scripts/                 # One-time data preparation scripts
+├── scripts/                 
 │   ├── reduce_to_40_tickers.py
 │   └── generate_sector_mapping_from_excel.py
 │
 ├── data/
 │   └── raw/
 │
-├── results/                 # Tables, figures, and model outputs
+├── results/                
 └── notebooks/
 
 
@@ -53,7 +53,7 @@ capstone/
 conda env create -f environment.yml
 conda activate capstone-env
 
-Data Preparation (One-Time)
+## Data Preparation (One-Time)
 
 The following scripts were executed once to prepare the dataset and are not
 part of the main pipeline:
@@ -70,7 +70,7 @@ market_anomalie_40.xlsx
 These files are already included in the repository and do not need to be
 re-generated to run the project.
 
-Running the Project
+## Running the Project
 
 From the root directory of the repository, run:
 python main.py
@@ -89,7 +89,7 @@ Result export and visualization
 
 All outputs are saved in the results/ directory.
 
-Models
+## Models
 
 The following supervised learning models are implemented:
 
