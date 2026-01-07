@@ -23,7 +23,7 @@ capstone/
 ├── PROPOSAL.md
 ├── environment.yml
 ├── requirements.txt
-├── main.py                 
+├── main.py
 │
 ├── src/
 │   ├── __init__.py
@@ -34,23 +34,19 @@ capstone/
 │   ├── models.py
 │   └── visualization.py
 │
-├── scripts/                 
+├── scripts/
 │   ├── reduce_to_40_tickers.py
 │   └── generate_sector_mapping_from_excel.py
 │
 ├── data/
 │   └── raw/
 │
-├── results/                
+├── results/
 └── notebooks/
-
-
-```markdown
-## Environment Setup
-
-### Option — Conda
-
-```bash
+Environment Setup
+Option — Conda
+bash
+Copier le code
 conda env create -f environment.yml
 conda activate capstone-env
 Data Preparation (One-Time)
@@ -59,11 +55,8 @@ part of the main pipeline:
 
 bash
 Copier le code
-
-
 python scripts/generate_sector_mapping_from_excel.py
 python scripts/reduce_to_40_tickers.py
-
 They generate the following files in data/raw/:
 
 sector_mapping.csv
@@ -73,11 +66,12 @@ market_anomalie_40.xlsx
 These files are already included in the repository and do not need to be
 re-generated to run the project.
 
-## Running the Project
-
+Running the Project
 From the root directory of the repository, run:
-python main.py
 
+bash
+Copier le code
+python main.py
 This script performs:
 
 Data loading and cleaning
@@ -92,8 +86,7 @@ Result export and visualization
 
 All outputs are saved in the results/ directory.
 
-## Models
-
+Models
 The following supervised learning models are implemented:
 
 Logistic Regression
@@ -117,7 +110,6 @@ Macro precision, recall, and F1-score
 A strict time-based train/test split is applied to avoid look-ahead bias.
 
 Notes
-
 main.py is the single entry point of the project.
 
 Scripts in scripts/ are utility scripts and are not imported by the pipeline.
